@@ -2,8 +2,8 @@ server:
   port: "8080"
 
 database:
-  host: "localhost"
-  port: "3306"
-  username: "root"
-  password: "root"
-  dbname: "blog_db"
+  host: "db.ngnkfioeispfjkfszdxz.supabase.co"
+  port: "5432"
+  username: "postgres"
+  password: "max123@qaq000."
+  dbname: "postgres"

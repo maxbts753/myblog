@@ -22,7 +22,8 @@ func main() {
 	// 初始化配置
 	config.Init()
 	// 初始化数据库
-	dsn := config.AppConfig.Database.Username + ":" + config.AppConfig.Database.Password + "@tcp(" + config.AppConfig.Database.Host + ":" + config.AppConfig.Database.Port + ")/" + config.AppConfig.Database.DBName + "?charset=utf8mb4&parseTime=True&loc=Local"
+	// PostgreSQL DSN格式: host=host port=port user=username password=password dbname=dbname
+	dsn := "host=" + config.AppConfig.Database.Host + " port=" + config.AppConfig.Database.Port + " user=" + config.AppConfig.Database.Username + " password=" + config.AppConfig.Database.Password + " dbname=" + config.AppConfig.Database.DBName + " sslmode=require"
 	if err := models.InitDB(dsn); err != nil {
 		log.Printf("Warning: %v", err)
 	}

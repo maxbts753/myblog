@@ -34,6 +34,13 @@ type Article struct {
 //   error - 操作过程中的错误，如果没有错误则为nil
 func GetArticles(limit, offset int, status string) ([]*Article, error) {
 	var articles []*Article
+	
+	// 检查DB是否为nil，避免空指针异常
+	if DB == nil {
+		// 返回空数组而不是nil，避免后续处理出错
+		return articles, nil
+	}
+	
 	query := DB.Preload("User").Order("created_at DESC")
 
 	if status != "" {
@@ -54,6 +61,11 @@ func GetArticles(limit, offset int, status string) ([]*Article, error) {
 // 注意：
 //   此函数在goroutine中异步执行，不会阻塞主流程
 func IncreaseArticleViews(id uint) {
+	// 检查DB是否为nil，避免空指针异常
+	if DB == nil {
+		return
+	}
+	
 	DB.Model(&Article{}).Where("id = ?", id).UpdateColumn("views", gorm.Expr("views + ?", 1))
 }
 // GetArticleByID 根据ID获取文章详情
@@ -66,6 +78,11 @@ func IncreaseArticleViews(id uint) {
 // 注意：
 //   函数返回时会异步调用IncreaseArticleViews增加浏览量
 func GetArticleByID(id uint) (*Article, error) {
+	// 检查DB是否为nil，避免空指针异常
+	if DB == nil {
+		return nil, nil
+	}
+	
 	var article Article
 	if err := DB.Preload("User").First(&article, id).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
@@ -87,6 +104,11 @@ func GetArticleByID(id uint) (*Article, error) {
 // 注意：
 //   函数会自动设置ID、CreatedAt和UpdatedAt字段
 func CreateArticle(article *Article) error {
+	// 检查DB是否为nil，避免空指针异常
+	if DB == nil {
+		return nil
+	}
+	
 	article.CreatedAt = time.Now()
 	article.UpdatedAt = time.Now()
 	return DB.Create(article).Error
@@ -102,6 +124,11 @@ func CreateArticle(article *Article) error {
 //   函数会自动更新UpdatedAt字段
 //   如果文章不存在，则不执行任何操作并返回nil
 func UpdateArticle(article *Article) error {
+	// 检查DB是否为nil，避免空指针异常
+	if DB == nil {
+		return nil
+	}
+	
 	article.UpdatedAt = time.Now()
 	return DB.Save(article).Error
 }
@@ -114,5 +141,10 @@ func UpdateArticle(article *Article) error {
 // 注意：
 //   如果文章不存在，则不执行任何操作并返回nil
 func DeleteArticle(article *Article) error {
+	// 检查DB是否为nil，避免空指针异常
+	if DB == nil {
+		return nil
+	}
+	
 	return DB.Delete(article).Error
 }

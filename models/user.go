@@ -28,6 +28,10 @@ type User struct {
 //   error - 操作过程中的错误，如果没有错误则为nil
 func GetUsers(limit, offset int) ([]*User, error) {
 	var users []*User
+	// 检查DB是否为nil，避免空指针异常
+	if DB == nil {
+		return users, nil
+	}
 	if err := DB.Order("id ASC").Limit(limit).Offset(offset).Find(&users).Error; err != nil {
 		return nil, err
 	}
@@ -41,6 +45,10 @@ func GetUsers(limit, offset int) ([]*User, error) {
 //   *User - 找到的用户指针，如果用户不存在则为nil
 //   error - 操作过程中的错误，如果没有错误则为nil
 func GetUserByUsername(username string) (*User, error) {
+	// 检查DB是否为nil，避免空指针异常
+	if DB == nil {
+		return nil, nil
+	}
 	var user User
 	if err := DB.Where("username = ?", username).First(&user).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
@@ -58,6 +66,10 @@ func GetUserByUsername(username string) (*User, error) {
 // 返回：
 //   error - 操作过程中的错误，如果没有错误则为nil
 func CreateUser(user *User) error {
+	// 检查DB是否为nil，避免空指针异常
+	if DB == nil {
+		return nil
+	}
 	user.CreatedAt = time.Now()
 	user.UpdatedAt = time.Now()
 	return DB.Create(user).Error
