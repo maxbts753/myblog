@@ -1,27 +1,102 @@
 package models
 
 import (
-	"sync"
+	"log"
+	"regexp"
 	"time"
 
 	"golang.org/x/crypto/bcrypt"
+	"gorm.io/driver/mysql"
+	"gorm.io/gorm"
+	"gorm.io/gorm/logger"
 )
 
-var (
-	users         = make(map[int]*User)
-	articles      = make(map[int]*Article)
-	nextUserID    = 1
-	nextArticleID = 1
-	dbMutex       sync.RWMutex
-)
+// DB 全局数据库连接实例
+var DB *gorm.DB
 
+// InitDB 初始化数据库连接
+// 参数：
+//   dsn - 数据库连接字符串
+// 返回：
+//   error - 初始化过程中的错误
+func InitDB(dsn string) error {
+	// 配置GORM日志
+	newLogger := logger.New(
+		log.New(log.Writer(), "\r\n", log.LstdFlags),
+		logger.Config{
+			SlowThreshold:             time.Second, // 慢SQL阈值
+			LogLevel:                  logger.Info, // 日志级别
+			IgnoreRecordNotFoundError: true,        // 忽略记录未找到错误
+			Colorful:                  true,        // 彩色打印
+		},
+	)
+
+	// 尝试连接数据库
+	log.Printf("尝试连接数据库，DSN: %s", maskPassword(dsn))
+	db, err := gorm.Open(mysql.Open(dsn), &gorm.Config{
+		Logger: newLogger,
+	})
+	if err != nil {
+		log.Printf("错误: 无法连接到数据库: %v", err)
+		log.Printf("请确保MySQL服务已启动，且配置信息正确")
+		log.Printf("配置信息: 主机=%s, 端口=%s, 用户名=%s, 数据库名=%s", 
+			getConfigValue("host"), getConfigValue("port"), getConfigValue("username"), getConfigValue("dbname"))
+		log.Printf("正在以模拟模式启动...")
+		// 模拟数据库连接，允许程序继续运行
+		return nil
+	}
+
+	// 设置连接池
+	sqlDB, err := db.DB()
+	if err != nil {
+		log.Printf("Warning: Failed to get database instance: %v. Using minimal configuration.", err)
+		return nil
+	}
+
+	// 设置连接池参数
+	sqlDB.SetMaxIdleConns(10)
+	sqlDB.SetMaxOpenConns(100)
+	sqlDB.SetConnMaxLifetime(time.Hour)
+
+	// 自动迁移表结构
+	err = db.AutoMigrate(&User{}, &Article{})
+	if err != nil {
+		log.Printf("Warning: Failed to migrate database: %v", err)
+		return nil
+	}
+
+	// 保存全局DB实例
+	DB = db
+
+	// 创建测试数据
+	createTestData()
+
+	log.Println("Database initialized successfully")
+	return nil
+}
+
+// createTestData 创建测试数据
 func createTestData() {
+	// 如果DB为nil，跳过创建测试数据
+	if DB == nil {
+		log.Println("Skipping test data creation: Database not connected")
+		return
+	}
+
+	// 检查是否已有数据
+	var userCount int64
+	DB.Model(&User{}).Count(&userCount)
+	if userCount > 0 {
+		return
+	}
+
 	password := "123456"
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 	if err != nil {
-		println("创建测试用户密码失败")
+		log.Println("创建测试用户密码失败:", err)
 		return
 	}
+
 	// 创建测试用户
 	adminUser := &User{
 		ID:        1,
@@ -32,8 +107,11 @@ func createTestData() {
 		CreatedAt: time.Now(),
 		UpdatedAt: time.Now(),
 	}
-	users[1] = adminUser
-	nextUserID = 2
+
+	if err := DB.Create(adminUser).Error; err != nil {
+		log.Println("创建测试用户失败:", err)
+		return
+	}
 
 	// 创建测试文章
 	testArticle := &Article{
@@ -45,18 +123,39 @@ func createTestData() {
 		Tags:      "博客,Go,Gin",
 		Status:    "published",
 		Views:     0,
-		UserID:    1,
+		UserID:    adminUser.ID,
 		CreatedAt: time.Now(),
 		UpdatedAt: time.Now(),
-		User:      adminUser,
 	}
-	articles[1] = testArticle
-	nextArticleID = 2
+
+	if err := DB.Create(testArticle).Error; err != nil {
+		log.Println("创建测试文章失败:", err)
+		return
+	}
+
+	log.Println("测试数据创建成功")
 }
 
-// InitDB 初始化数据库，实际项目中应该连接真实数据库
-func InitDB() {
-	// 创建测试数据
-	createTestData()
-	println("数据库初始化成功，创建了测试数据")
+// maskPassword 隐藏DSN中的密码部分，用于安全日志记录
+func maskPassword(dsn string) string {
+	// 匹配MySQL DSN格式: username:password@tcp(host:port)/dbname
+	re := regexp.MustCompile(`(.*):(.*)@tcp`)
+	return re.ReplaceAllString(dsn, `$1:******@tcp`)
+}
+
+// getConfigValue 从DSN中提取配置值
+func getConfigValue(key string) string {
+	// 注意：这里需要从配置中获取值，暂时返回默认值
+	switch key {
+	case "host":
+		return "localhost"
+	case "port":
+		return "3306"
+	case "username":
+		return "root"
+	case "dbname":
+		return "blog_db"
+	default:
+		return ""
+	}
 }

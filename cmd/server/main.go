@@ -3,36 +3,64 @@ package main
 import (
 	"gofile/handlers"
 	"gofile/internal/config"
+	"gofile/middleware"
 	"gofile/models"
-	
+	"log"
+
 	"github.com/gin-gonic/gin"
 )
 
+// main 应用程序入口函数
+// 此函数是整个Web应用的启动入口
+// 主要功能：
+// 1. 初始化配置 - 从配置文件加载应用配置
+// 2. 初始化数据库 - 创建测试数据（开发环境）
+// 3. 创建Gin引擎实例 - 设置Web服务器框架
+// 4. 配置路由 - 设置API和页面路由
+// 5. 启动HTTP服务器 - 监听指定端口
 func main() {
 	// 初始化配置
 	config.Init()
-	println(config.AppConfig.Server.Port) //还是不理解为什么会读到配置文件里面的字符串"8080"
-
 	// 初始化数据库
-	models.InitDB()
-	
-	// 创建Gin引擎
+	dsn := config.AppConfig.Database.Username + ":" + config.AppConfig.Database.Password + "@tcp(" + config.AppConfig.Database.Host + ":" + config.AppConfig.Database.Port + ")/" + config.AppConfig.Database.DBName + "?charset=utf8mb4&parseTime=True&loc=Local"
+	if err := models.InitDB(dsn); err != nil {
+		log.Printf("Warning: %v", err)
+	}
 
-r := gin.Default()
+	// 创建Gin引擎并配置路由
+	r := gin.Default()
 
 	// 设置路由
 	setupRoutes(r)
 
+	// 启动服务器
 	port := config.AppConfig.Server.Port
 	if port == "" {
 		port = "8080"
 	}
-
-	r.Run(":"+port)
+	serverAddr := ":" + port
+	log.Printf("Server starting on %s", serverAddr)
+	if err := r.Run(serverAddr); err != nil {
+		log.Fatalf("Failed to start server: %v", err)
+	}
 }
+// setupRoutes 配置应用程序的路由
+// 此函数设置所有API路由和页面路由
+// 参数：
+//   r - Gin引擎实例，用于注册路由
+// 路由结构：
+//   1. 静态文件路由 - 用于提供静态资源文件
+//   2. API路由组 - 所有API端点的基础路径
+//      - /api/article/* - 文章相关API
+//      - /api/user/* - 用户相关API
+//   3. 首页路由 - 网站首页
 func setupRoutes(r *gin.Engine) {
-	// 静态文件服务
+	// 添加中间件
+	r.Use(middleware.CORSMiddleware())
+
+	// 静态文件路由 - 提供前端资源
 	r.Static("/static", "./static")
+	// API路由组
 	api := r.Group("/api")
 	{
 		article := api.Group("/article")
@@ -50,6 +78,7 @@ func setupRoutes(r *gin.Engine) {
 			user.POST("/register", handlers.Register)//用户注册
 		}
 	}
+	
+	// 首页路由
 	r.GET("/", handlers.GetHome)
-	// 可以根据需要添加页面路由，目前只保留API路由
 }
