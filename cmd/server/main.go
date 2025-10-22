@@ -1,9 +1,10 @@
 package main
 
 import (
-	"gofile/internal/config"
 	"gofile/handlers"
+	"gofile/internal/config"
 	"gofile/models"
+	
 	"github.com/gin-gonic/gin"
 )
 
@@ -36,7 +37,19 @@ func setupRoutes(r *gin.Engine) {
 	{
 		article := api.Group("/article")
 		{
-			article.GET("/",handlers.GetArticles)
+			article.GET("/", handlers.GetArticles)       // 获取文章列表
+			article.GET("/:id", handlers.GetArticle)     // 获取单个文章
+			article.POST("/", handlers.CreateArticle)    // 创建新文章
+			article.PUT("/:id", handlers.UpdateArticle)   // 更新文章
+			article.DELETE("/:id", handlers.DeleteArticle) // 删除文章
+		}
+		user := api.Group("/user")
+		{
+			user.GET("/", handlers.GetUsers) // 获取用户列表
+			user.POST("/login", handlers.Login)//用户登录
+			user.POST("/register", handlers.Register)//用户注册
 		}
 	}
+	r.GET("/", handlers.GetHome)
+	// 可以根据需要添加页面路由，目前只保留API路由
 }

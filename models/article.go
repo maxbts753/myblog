@@ -64,3 +64,71 @@ func GetArticles(limit, offset int, status string) ([]*Article, error) {
 
 	return result, nil
 }
+
+func IncreaseArticleViews(id uint) {
+	dbMutex.Lock()
+	defer dbMutex.Unlock()
+
+	if article, exists := articles[int(id)]; exists {
+		article.Views++
+	}
+	return
+}
+func GetArticleByID(id uint) (*Article, error) {
+	dbMutex.RLock()
+	defer dbMutex.RUnlock()
+
+	article, exists := articles[int(id)]
+	if !exists {
+		return nil, nil
+	}
+
+	articleCopy := *article
+
+	user, exists := users[articleCopy.UserID]
+	if exists {
+		articleCopy.User = &User{
+			ID:       user.ID,
+			Username: user.Username,
+			Nickname: user.Nickname,
+		}
+	}
+	go IncreaseArticleViews(id)
+	return &articleCopy, nil
+}
+
+func CreateArticle(article *Article) error {
+	dbMutex.Lock()
+	defer dbMutex.Unlock()
+
+	id := len(articles) + 1
+	article.ID = id
+	article.CreatedAt = time.Now()
+	article.UpdatedAt = time.Now()
+	articles[id] = article
+	return nil
+}
+
+func UpdateArticle(article *Article) error {
+	dbMutex.Lock()
+	defer dbMutex.Unlock()
+
+	if _, exists := articles[article.ID]; !exists {
+		return nil
+	}
+
+	article.UpdatedAt = time.Now()
+	articles[article.ID] = article
+	return nil
+}
+func DeleteArticle(article *Article) error {
+	dbMutex.Lock()
+	defer dbMutex.Unlock()
+
+	if _, exists := articles[article.ID]; !exists {
+		return nil
+	}
+
+	delete(articles, article.ID)
+	return nil
+}
